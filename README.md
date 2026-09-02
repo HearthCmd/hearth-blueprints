@@ -22,6 +22,7 @@ Hearth monorepo at `docs/blueprints.md`.
 
 | Slug | What it is |
 |---|---|
+| `verge_labs/onboarding_facilitator` | Works out what a household needs and proposes it for a person to approve — the role that reads every other blueprint. |
 | `verge_labs/dj` | Runs music around the house — by room, by mood, on a schedule. |
 | `verge_labs/chef` | Puts recipes on the kitchen screen and answers questions while you cook. |
 | `verge_labs/footman` | Answers the household's voice devices and hands each request to whoever should handle it. |
