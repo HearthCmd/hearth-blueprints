@@ -1,0 +1,185 @@
+blueprint: verge_labs/dj
+blueprint_schema: 1
+version: 0.1.0
+display_name: DJ
+summary: Runs music around the house — by room, by mood, and on a schedule.
+tags: [music, entertainment, rooms, voice]
+maintainer: Verge Labs
+
+requires:
+  - alias: host
+    kind: host
+    role: agent
+    if_missing: abort
+
+  - alias: music
+    kind: resource_connection
+    any_of:
+      - plugin: verge_labs/home_assistant_music_assistant
+      - plugin: verge_labs/sonos
+      - plugin: verge_labs/spotify
+    guidance: |
+      Three plugins can play music and the right one depends on what the house
+      already runs. In preference order:
+
+      Music Assistant, if Home Assistant is already in the house. It is
+      provider-agnostic — whatever Music Assistant is connected to is
+      reachable — it plays by name with no search step, and it drives any
+      speaker Home Assistant drives. It needs only a Home Assistant token,
+      which the household may already have.
+
+      Sonos, if the speakers are Sonos and there is no Home Assistant. Worth
+      knowing before choosing it: Sonos has no search. It can only start
+      things already saved as Sonos favourites or playlists, so "play the new
+      Big Thief record" will not work unless someone saved it first.
+
+      Spotify, only if they have Premium and are willing to register their own
+      free Spotify app. It is the only option with the full catalogue and real
+      search, but Spotify serves five users per app, so a shared one could
+      never cover more than five households — hence the one-time setup.
+    setup: |
+      For Music Assistant (the usual choice), you need a Home Assistant
+      long-lived access token:
+
+      1. Open Home Assistant and make sure the Music Assistant integration is
+         installed and working. This plugin talks to Home Assistant; Music
+         Assistant is what actually turns a request into audio.
+      2. Click your user avatar at the bottom-left of the sidebar.
+      3. Scroll to the bottom of the profile page, to "Long-lived access
+         tokens", and choose "Create token".
+      4. Name it something you'll recognise later, like "Hearth".
+      5. Copy it immediately — Home Assistant shows it once and never again.
+      6. You will also need your Home Assistant URL, including scheme and
+         port, e.g. http://homeassistant.local:8123
+
+      Sonos and Spotify connect by signing in through the vendor instead, and
+      Spotify additionally needs a client id from your own Spotify app.
+    if_missing: advisory
+
+  - alias: screen
+    kind: display_screen
+    optional: true
+    guidance: |
+      Only if the household already has a screen somewhere people gather. The
+      DJ works perfectly well without one; what a screen adds is being able to
+      see what is playing without asking.
+
+skills:
+  - skill: verge_labs/music_rooms
+
+parameters:
+  - name: default_room
+    prompt: When someone asks for music without naming a room, where should it play?
+    default: the living room
+
+items:
+  - handle: jd
+    op: create
+    primitive: agent_job_description
+    risk: read
+    why: The role itself — what the DJ is responsible for.
+    fields:
+      title: DJ
+      mandate: |
+        You run music around the house.
+
+        People will ask you for music the way they would ask a person: "put
+        something on", "turn it down a bit", "move this to the kitchen",
+        "something for cooking dinner". Interpret the request; do not make
+        anyone learn a syntax. When a request is vague, make a reasonable
+        choice and start playing — asking three clarifying questions before any
+        sound comes out is the wrong trade. If you guessed wrong, they will
+        tell you, and changing it is cheap.
+
+        Rooms are the unit people think in, not speakers or zones. When
+        someone does not name a room, use {{default_room}}. When they say
+        "in here" and you cannot tell where they are, ask once rather than
+        guessing wrong in a way that plays music at someone asleep.
+
+        Volume is the request people most often regret you getting wrong.
+        Prefer a relative change to an absolute one — "turn it down" means
+        down from where it is, not down to some number you chose.
+
+        Some things are not yours to decide unasked: do not start music in a
+        room nobody said, do not play announcements or clips through the
+        speakers unless someone asked for one, and treat late-night and
+        early-morning requests as a reason to start quiet rather than at
+        whatever volume was last used.
+
+        You will not always have the whole world's catalogue. Depending on how
+        this household plays music you may be limited to what someone already
+        saved. When you cannot find what was asked for, say so plainly and
+        offer the nearest thing you can actually play, rather than starting
+        something different and hoping.
+      required_skills: |
+        Understanding how rooms, speakers and groups relate; how to move
+        playback between rooms; how to find something by name in whatever
+        library the household has connected.
+
+  - handle: wd
+    op: create
+    primitive: working_directory
+    risk: read
+    why: Somewhere for the DJ to keep its own notes and state.
+    fields:
+      host_id: "@{host}"
+      directory_path: "@{agent_home}/dj"
+
+  - handle: pos
+    op: create
+    primitive: organization_position
+    risk: read
+    why: The DJ's post in the household.
+    depends_on: [jd, wd]
+    fields:
+      agent_job_description_id: "${jd.id}"
+      working_directory_id: "${wd.id}"
+
+  - handle: agent
+    op: create
+    primitive: ai_agent_instance
+    risk: act
+    why: The DJ itself. An economical brain is right here — this is interpretation and dispatch, not deep reasoning.
+    depends_on: [pos]
+    fields:
+      organization_position_id: "${pos.id}"
+      harness_id: "@{harness}"
+      ai_brain_model_id: "@{model:economical}"
+      name: DJ
+
+  - op: grant
+    primitive: agent_resource_grant
+    risk: act
+    why: Playing, pausing and moving music between rooms is the entire job.
+    depends_on: [agent]
+    fields:
+      ai_agent_instance_id: "${agent.id}"
+      resource_connection_id: "@{music}"
+      rules:
+        - { action: "*", decision: allow }
+
+  - op: grant
+    primitive: rule
+    risk: act
+    why: So what's playing can be shown on the screen without anyone asking.
+    depends_on: [agent]
+    fields:
+      scope_kind: agent
+      scope_value: "${agent.id}"
+      resource_kind: display
+      resource_id: "@{screen}"
+      action: display.publish
+      decision: allow
+
+  - op: notify
+    primitive: introduction
+    risk: act
+    why: Tell the household there's someone to ask for music now.
+    depends_on: [agent]
+    fields:
+      audience: household_members
+      text: |
+        There's a DJ in the house now. Ask it for music the way you'd ask a
+        person — "put something on in the kitchen", "turn it down", "move this
+        to the living room" — and it'll work out the rest. If it plays the
+        wrong thing, just tell it.

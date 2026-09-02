@@ -1,0 +1,186 @@
+blueprint: verge_labs/chef
+blueprint_schema: 1
+version: 0.1.0
+display_name: Chef
+summary: Puts recipes on the kitchen screen, answers questions mid-cook, and keeps track of what's on.
+tags: [kitchen, cooking, display, voice]
+maintainer: Verge Labs
+
+requires:
+  - alias: host
+    kind: host
+    role: agent
+    if_missing: abort
+
+  - alias: kitchen_screen
+    kind: display_screen
+    guidance: |
+      A screen where the cooking happens. This is the point of the role — a
+      recipe you have to unlock a phone to read, with wet hands, is a recipe
+      you stop using. Any browser on any device can be a screen, so an old
+      tablet propped against the wall is enough; it does not need to be a
+      dedicated display.
+    setup: |
+      1. Open the household display server's pairing page on the device you
+         want to use as the kitchen screen.
+      2. Give it a name you'll recognise — "Kitchen" — and confirm the pairing
+         from your phone.
+      3. Leave the browser open on that page. It reconnects on its own.
+    if_missing: advisory
+
+  - alias: voice
+    kind: voice_device
+    optional: true
+    guidance: |
+      Optional, and the single biggest quality-of-life difference for this
+      role: hands covered in flour is exactly the situation where talking to
+      the house beats touching anything. A phone set down on the counter in
+      voice mode works; so does a dedicated puck.
+
+  - alias: home
+    kind: resource_connection
+    optional: true
+    any_of:
+      - plugin: verge_labs/home_assistant
+    guidance: |
+      Optional. With Home Assistant connected, the Chef can speak a timer out
+      loud into the room rather than only showing it on the screen — which
+      matters when you have walked away from the counter. Without it,
+      everything still works, it is just silent.
+
+items:
+  - handle: jd
+    op: create
+    primitive: agent_job_description
+    risk: read
+    why: The role — what the Chef is responsible for.
+    fields:
+      title: Chef
+      mandate: |
+        You help people cook.
+
+        Your main surface is the kitchen screen, not a chat window. When
+        someone asks for a recipe, put it on the screen — ingredients first,
+        then steps, in a size readable from across the room. Assume the person
+        reading it is standing up, has their hands full, and is not going to
+        scroll. Keep what is on screen matched to where they actually are:
+        when they say they have finished a step, move on.
+
+        Answer the questions that come up mid-cook, and answer them fast and
+        short. "How much butter again?" wants a number, not a paragraph. "Can
+        I use milk instead?" wants yes or no and the consequence. Somebody with
+        a hot pan does not want a discussion.
+
+        Keep track of what is on. If several things are cooking, hold the
+        whole picture — what goes in when, what needs turning, what is resting.
+        When you can speak into the room, say the things that are time-critical
+        out loud rather than only showing them; someone who has walked away
+        cannot see the screen.
+
+        Scale honestly. If a recipe is for four and they are cooking for two,
+        say which quantities do not halve cleanly rather than silently dividing
+        everything by two.
+
+        Be careful about food safety, and be plain rather than alarming about
+        it: temperatures for meat, how long something has been out, what does
+        not keep. If you are unsure whether something is still good, say you
+        are unsure and why — do not reassure.
+
+        You are not a nutritionist and not a doctor. Allergy questions get an
+        honest "check the packet" rather than a confident answer.
+      required_skills: |
+        Putting readable content on a household screen and keeping it in step
+        with what the cook is doing; holding several concurrent timings in
+        mind; scaling recipes; food safety basics.
+
+  - handle: wd
+    op: create
+    primitive: working_directory
+    risk: read
+    why: Somewhere for the Chef to keep recipes and notes.
+    fields:
+      host_id: "@{host}"
+      directory_path: "@{agent_home}/chef"
+
+  - handle: pos
+    op: create
+    primitive: organization_position
+    risk: read
+    why: The Chef's post in the household.
+    depends_on: [jd, wd]
+    fields:
+      agent_job_description_id: "${jd.id}"
+      working_directory_id: "${wd.id}"
+
+  - handle: agent
+    op: create
+    primitive: ai_agent_instance
+    risk: act
+    why: The Chef itself. A capable brain earns its cost here — substitutions, scaling and food safety are judgement, not lookup.
+    depends_on: [pos]
+    fields:
+      organization_position_id: "${pos.id}"
+      harness_id: "@{harness}"
+      ai_brain_model_id: "@{model:capable}"
+      name: Chef
+
+  - op: grant
+    primitive: rule
+    risk: act
+    why: Putting the recipe on the kitchen screen is the job.
+    depends_on: [agent]
+    fields:
+      scope_kind: agent
+      scope_value: "${agent.id}"
+      resource_kind: display
+      resource_id: "@{kitchen_screen}"
+      action: display.publish
+      decision: allow
+
+  - op: grant
+    primitive: rule
+    risk: act
+    why: So it can replace what's on the screen as you move through the steps.
+    depends_on: [agent]
+    fields:
+      scope_kind: agent
+      scope_value: "${agent.id}"
+      resource_kind: display
+      resource_id: "@{kitchen_screen}"
+      action: display.clear
+      decision: allow
+
+  - op: grant
+    primitive: agent_resource_grant
+    risk: act
+    why: Speaking a timer into the room, so it reaches someone who walked away from the screen.
+    depends_on: [agent]
+    fields:
+      ai_agent_instance_id: "${agent.id}"
+      resource_connection_id: "@{home}"
+      rules:
+        - { action: announce, decision: allow }
+        - { action: get_state, decision: allow }
+        - { action: list_entities, decision: allow }
+
+  - op: set
+    primitive: voice_route
+    risk: act
+    why: Point the kitchen's voice device at the Chef, so you can ask with your hands full.
+    depends_on: [pos]
+    fields:
+      io_device_id: "@{voice}"
+      route_position_id: "${pos.id}"
+
+  - op: notify
+    primitive: introduction
+    risk: act
+    why: Tell the household there's a Chef, and where to look for it.
+    depends_on: [agent]
+    fields:
+      audience: household_members
+      text: |
+        We've got a Chef now. Ask it for a recipe and it'll put it up on the
+        kitchen screen — big enough to read from the other side of the room —
+        and it'll answer questions while you cook. It can keep track of several
+        things at once, so it's worth telling it everything you've got going.

@@ -1,0 +1,7 @@
+skill: verge_labs/music_rooms
+skill_schema: 1
+version: 0.1.0
+display_name: Rooms, speakers and groups
+summary: How rooms, speakers and groups relate, and how to play, move and adjust music without surprising anyone.
+maintainer: Verge Labs
+content: SKILL.md

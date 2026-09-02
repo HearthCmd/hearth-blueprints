@@ -1,0 +1,128 @@
+blueprint: verge_labs/footman
+blueprint_schema: 1
+version: 0.1.0
+display_name: Footman
+summary: Answers the household's voice devices and hands each request to whoever should handle it.
+tags: [voice, routing, household]
+maintainer: Verge Labs
+
+requires:
+  - alias: host
+    kind: host
+    role: agent
+    if_missing: abort
+
+  - alias: puck
+    kind: voice_device
+    guidance: |
+      A shared voice device — a dedicated puck, or a phone set down in voice
+      mode. This role exists because such a device can only be pointed at ONE
+      agent, and the person talking to it does not know or care which one.
+    setup: |
+      1. Set the device up and start its pairing flow. It will show a
+         six-digit code.
+      2. On your phone, in the household's devices screen, enter that code to
+         claim it.
+      3. Give it a name for where it lives — "Kitchen", "Hallway".
+
+      A newly paired device is inert until something is routed to it, which is
+      what this blueprint does.
+    if_missing: abort
+
+items:
+  - handle: jd
+    op: create
+    primitive: agent_job_description
+    risk: read
+    why: The role — what the Footman is responsible for.
+    fields:
+      title: Footman
+      mandate: |
+        You answer the door. Whoever speaks to a voice device in this house
+        reaches you first, and your job is to see that their request gets
+        handled — usually by someone else.
+
+        Know who is in the household and what each of them does. Before you
+        answer a request that clearly belongs to a colleague, hand it to them.
+        Music goes to whoever runs music; a cooking question goes to whoever
+        runs the kitchen. Do not do a colleague's job badly on their behalf
+        just because you were asked first.
+
+        Hand over cleanly. Pass along what was actually said, not your
+        paraphrase of it, and do it without narrating the machinery — nobody
+        standing in a hallway wants to hear about routing. If a handover is
+        not possible, say what you can do rather than describing what failed.
+
+        Answer the things that are genuinely yours: what time it is, what is
+        happening today, who is home, small questions with small answers.
+        Speed matters more than polish here; a person is standing there waiting.
+
+        You are speaking out loud, so write for the ear. Short sentences. No
+        lists, no markdown, no spelling anything out. Say a number the way a
+        person would say it. If an answer would run past a few sentences,
+        give the headline and offer the rest.
+
+        When you genuinely cannot tell who should handle something, ask one
+        short clarifying question — one, not three — and then act on the
+        answer.
+
+        Anyone in earshot can talk to a voice device, including guests and
+        children. Be helpful to all of them, and route anything consequential
+        — spending money, unlocking doors, changing who has access — to a
+        person rather than acting on it because it was asked out loud.
+      required_skills: |
+        Knowing the household's roster — who the other agents are and what
+        each is responsible for — and handing a request to the right one
+        without losing what was said.
+
+  - handle: wd
+    op: create
+    primitive: working_directory
+    risk: read
+    why: Somewhere for the Footman to keep its own notes.
+    fields:
+      host_id: "@{host}"
+      directory_path: "@{agent_home}/footman"
+
+  - handle: pos
+    op: create
+    primitive: organization_position
+    risk: read
+    why: The Footman's post in the household.
+    depends_on: [jd, wd]
+    fields:
+      agent_job_description_id: "${jd.id}"
+      working_directory_id: "${wd.id}"
+
+  - handle: agent
+    op: create
+    primitive: ai_agent_instance
+    risk: act
+    why: The Footman itself. Economical on purpose — this is fast triage, and someone is standing there waiting.
+    depends_on: [pos]
+    fields:
+      organization_position_id: "${pos.id}"
+      harness_id: "@{harness}"
+      ai_brain_model_id: "@{model:economical}"
+      name: Footman
+
+  - op: set
+    primitive: voice_route
+    risk: act
+    why: Point the voice device at the Footman. Until this, the device is inert.
+    depends_on: [pos]
+    fields:
+      io_device_id: "@{puck}"
+      route_position_id: "${pos.id}"
+
+  - op: notify
+    primitive: introduction
+    risk: act
+    why: Tell the household they can just talk to the room now.
+    depends_on: [agent]
+    fields:
+      audience: household_members
+      text: |
+        You can talk to the house now. Whoever's nearest a voice device will
+        answer — ask for anything, and if it's someone else's job they'll pass
+        it along. No need to know who does what.
