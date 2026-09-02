@@ -176,6 +176,18 @@ def main():
                 "tags": sorted(doc.get("tags") or []),
                 "files": files,
             }
+            # Blueprints carry their whole parsed body. The consumer that has to
+            # ACT on a blueprint — resolving its placeholders against a real
+            # household — speaks JSON and has no YAML parser, and this is the one
+            # place that already parses YAML. Deriving it here at release time
+            # means there is still exactly one source of truth (the .yaml file)
+            # and nothing to keep in sync by hand.
+            #
+            # Bodies are a few KB each. If this catalog ever reaches a few
+            # hundred blueprints, split them into their own release asset rather
+            # than growing a file that is polled daily.
+            if tree == "blueprints":
+                entries[slug]["body"] = doc
             if doc.get("min_relay_version"):
                 entries[slug]["min_relay_version"] = str(doc["min_relay_version"])
             docs[slug] = doc
