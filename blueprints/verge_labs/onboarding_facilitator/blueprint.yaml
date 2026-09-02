@@ -1,6 +1,6 @@
 blueprint: verge_labs/onboarding_facilitator
 blueprint_schema: 1
-version: 0.1.0
+version: 0.2.0
 display_name: Onboarding Facilitator
 summary: Works out what a household needs and proposes it for a person to approve — the role that reads every other blueprint.
 tags: [onboarding, household, setup, meta]
@@ -110,6 +110,23 @@ items:
       resource_kind: discovery
       resource_id: "*"
       action: discovery.list
+      decision: allow
+
+  - op: grant
+    primitive: rule
+    risk: act
+    why: >-
+      Lets it draft a proposal in its own folder — and nowhere else. Submitting
+      one REQUIRES writing the items to a file first, so without this every
+      suggestion it makes stalls waiting for someone to tap approve on a phone.
+    depends_on: [pos]
+    fields:
+      scope_kind: position
+      scope_value: "${pos.id}"
+      resource_kind: tool
+      resource_id: "*"
+      action: Write
+      predicate: Write(@{agent_home}/onboarding_facilitator/**)
       decision: allow
 
   - op: grant
