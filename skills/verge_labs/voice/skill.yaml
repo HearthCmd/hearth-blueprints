@@ -1,0 +1,7 @@
+skill: verge_labs/voice
+skill_schema: 1
+version: 0.1.0
+display_name: Answering a voice device
+summary: How to reply out loud on a household voice device — the spoken-reply markup the relay voices for you, keeping the mic open for a question, writing for the ear, and handing off.
+maintainer: Verge Labs
+content: SKILL.md
