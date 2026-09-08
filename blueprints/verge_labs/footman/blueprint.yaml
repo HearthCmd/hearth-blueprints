@@ -1,6 +1,6 @@
 blueprint: verge_labs/footman
 blueprint_schema: 1
-version: 0.1.0
+version: 0.2.0
 display_name: Footman
 summary: Answers the household's voice devices and hands each request to whoever should handle it.
 tags: [voice, routing, household]
@@ -105,6 +105,20 @@ items:
       harness_id: "@{harness}"
       ai_brain_model_id: "@{model:economical}"
       name: Footman
+
+  - op: grant
+    primitive: skill
+    risk: read
+    why: >-
+      The Footman answers a voice device, so it needs to know HOW to talk on one:
+      wrap spoken words in the reply markup the relay voices (never announce them
+      itself), keep the mic open only when it asked a question, write for the ear,
+      and hand off cleanly. Loaded once into its context rather than repeated on
+      every utterance.
+    depends_on: [pos]
+    fields:
+      organization_position_id: "${pos.id}"
+      skill_slug: verge_labs/voice
 
   - op: set
     primitive: voice_route

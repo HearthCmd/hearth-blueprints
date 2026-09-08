@@ -32,6 +32,7 @@ Hearth monorepo at `docs/blueprints.md`.
 | Slug | What it covers |
 |---|---|
 | `verge_labs/music_rooms` | How rooms, speakers and groups relate, and how to play, move and adjust music without surprising anyone. |
+| `verge_labs/voice` | How to reply out loud on a household voice device — the spoken-reply markup the relay voices, keeping the mic open for a question, writing for the ear, and handing off. |
 
 ---
 
